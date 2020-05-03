@@ -1,0 +1,86 @@
+E2E pipeline
+--------------------
+
+1) 
+KAFKA
+-----
+
+cd /opt/zookeeper 
+
+sudo bin/zkServer.sh start
+
+bin/kafka-server-start.sh config/server.properties
+
+bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic kfktpksix
+
+bin/kafka-console-producer.sh --broker-list localhost:9092 --topic kfktpksix
+
+bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic kfktpksix --from-beginning
+
+===================================================
+
+
+2) Mysql Table
+--------------
+
+sudo mysql -u root -p
+
+use test1;
+
+create table weblogdetails5 (id int NOT NULL AUTO_INCREMENT,datevalue timestamp, ipaddress varchar(150),host varchar(150),url varchar(150),responsecode integer,batch_id long, PRIMARY KEY (id));
+
+====================================================
+
+
+3) Run Spark Streaming JOB
+
+====================================================
+
+4) SQOOP
+--------------
+
+cd sqoop/bin
+
+
+./sqoop job --create Sqoop_weblogdetails_test37 -- import --connect jdbc:mysql://localhost:3306/test1 --username root --password-file file:///home/knoldus/sqoop.password --table weblogdetails5 --target-dir /airflowproject/Sqoop_weblogdetails_test1 --incremental append --check-column id --last-value 0 -m1 --direct
+
+
+./sqoop job --exec Sqoop_weblogdetails_test37
+
+========================================================
+
+5) hive
+--------
+
+cd /apache-hive-2.1.0-bin/bin
+
+./hive
+
+
+hive> create database est1;
+use test1;
+
+create external table weblog_external(id int, datevalue string, ipaddress string, host string, url string, responsecode int) row format delimited fields terminated by ',' stored as textfile location '/airflowproject/Sqoop_weblogdetails_test1';
+
+select * from weblog_external;
+
+create table weblog_partiton_table (id int, datevalue string, ipaddress string, url string, responsecode int) partitioned by (host string) row format delimited fields terminated by ',' stored as textfile;
+
+desc formatted weblog_partiton_table;
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.exec.max.dynamic.partitions=1000;
+
+insert into weblog_partiton_table partition(host) select id, datevalue, ipaddress, url, responsecode, host from weblog_external as a where not exists(select b.id from weblog_partiton_table as b where a.id = b.id);
+
+=================================
+
+6) Spark Hive Aggregation Job
+
+=================================
+
+7) Airflow DAG
+
+
+
+
